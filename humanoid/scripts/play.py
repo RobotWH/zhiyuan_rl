@@ -48,9 +48,74 @@ from datetime import datetime
 import pygame
 from threading import Thread
 
+from pynput import keyboard
+import threading,time
+
 
 x_vel_cmd, y_vel_cmd, yaw_vel_cmd = 0.0, 0.0, 0.0
-joystick_use = True
+
+class KeyboardThread(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.lock = threading.Lock()
+        self.target_vel_x = 0.0
+        self.target_vel_y = 0.0
+        self.target_ang_vel_yaw = 0.0
+        self.running = True
+
+        # 初始化监听器
+        self.listener = keyboard.Listener(
+            on_press=self.on_press,
+            on_release=self.on_release
+        )
+
+    def on_press(self, key):
+        try:
+            with self.lock:
+                if  key.char == 'w':
+                    self.target_vel_x = min(self.target_vel_x + 0.1, 1)  # 前进速度
+                    # print(f"self.target_vel_x :{self.target_vel_x}")
+                elif key.char == 's':
+                    self.target_vel_x = max(self.target_vel_x - 0.1, -1)  # 后退速度
+                elif key.char == 'a':
+                    self.target_vel_y = min(self.target_vel_y + 0.1, 0.5)   # 左平移
+                elif key.char == 'd':
+                    self.target_vel_y = max(self.target_vel_y - 0.1, -0.5)  # 右平移
+                elif key.char == 'e':
+                    self.target_ang_vel_yaw = -0.5  # 左转速度
+                elif key.char == 'q':
+                    self.target_ang_vel_yaw = 0.5  # 右转速度
+                elif key.char == 'r': 
+                    self.target_vel_x = 0.0
+                    self.target_vel_y = 0.0
+                    self.target_ang_vel_yaw = 0.0
+        except AttributeError:
+            pass
+
+    def on_release(self, key):
+        try:
+            with self.lock:
+                if key.char == 'e' or key.char == 'q':
+                    self.target_ang_vel_yaw = 0.0  # 松开 e 或 q 时重置角速度
+        except AttributeError:
+            pass
+
+    def run(self):
+        self.listener.start()
+        while self.running:
+            time.sleep(0.001)  # ✅ 释放CPU资源
+
+    def get_velocity(self):
+        with self.lock:
+            return self.target_vel_x, self.target_vel_y,self.target_ang_vel_yaw
+
+    def stop(self):
+        self.running = False
+        self.listener.stop()
+        self.join()
+
+
+joystick_use = False
 joystick_opened = False
 
 if joystick_use:
@@ -82,7 +147,9 @@ if joystick_use:
         joystick_thread.start()
 
 
-def play(args):
+def play(args):    
+    keyboard_thread = KeyboardThread()
+    keyboard_thread.start()
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 1)
@@ -178,16 +245,20 @@ def play(args):
     obs = env.get_observations()
 
     np.set_printoptions(formatter={"float": "{:0.4f}".format})
+    vel_x = 0.0
+    vel_y = 0.0
+    ang_vel_yaw = 0
     for i in range(10 * stop_state_log):
 
         actions = policy(obs.detach())  # * 0.
-
+        vel_x,vel_y,ang_vel_yaw = keyboard_thread.get_velocity()
+        print(f"vel_x:{vel_x}, vel_y:{vel_y},ang_vel_yaw:{ang_vel_yaw}")
+        
         if FIX_COMMAND:
-            env.commands[:, 0] = 0.4  # 1.0
-            env.commands[:, 1] = 0
-            env.commands[:, 2] = 0.0
-            env.commands[:, 3] = 0.0
-
+            env.commands[:, 0] = vel_x  # 1.0
+            env.commands[:, 1] = vel_y
+            env.commands[:, 2] = ang_vel_yaw
+            env.commands[:, 3] = 0.
         else:
             env.commands[:, 0] = x_vel_cmd  # 1.0
             env.commands[:, 1] = y_vel_cmd
@@ -266,6 +337,6 @@ def play(args):
 if __name__ == "__main__":
     EXPORT_POLICY = True
     RENDER = False
-    FIX_COMMAND = False
+    FIX_COMMAND = True
     args = get_args()
     play(args)

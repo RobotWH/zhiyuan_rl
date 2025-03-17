@@ -44,9 +44,71 @@ from threading import Thread
 from humanoid.utils.helpers import get_load_path
 import os
 import time
+from pynput import keyboard
+import threading,time
 
 x_vel_cmd, y_vel_cmd, yaw_vel_cmd = 0.0, 0.0, 0.0
-joystick_use = True
+class KeyboardThread(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.lock = threading.Lock()
+        self.target_vel_x = 0.0
+        self.target_vel_y = 0.0
+        self.target_ang_vel_yaw = 0.0
+        self.running = True
+
+        # 初始化监听器
+        self.listener = keyboard.Listener(
+            on_press=self.on_press,
+            on_release=self.on_release
+        )
+
+    def on_press(self, key):
+        try:
+            with self.lock:
+                if  key.char == 'w':
+                    self.target_vel_x = min(self.target_vel_x + 0.1, 1)  # 前进速度
+                    # print(f"self.target_vel_x :{self.target_vel_x}")
+                elif key.char == 's':
+                    self.target_vel_x = max(self.target_vel_x - 0.1, -1)  # 后退速度
+                elif key.char == 'a':
+                    self.target_vel_y = min(self.target_vel_y + 0.1, 0.5)   # 左平移
+                elif key.char == 'd':
+                    self.target_vel_y = max(self.target_vel_y - 0.1, -0.5)  # 右平移
+                elif key.char == 'e':
+                    self.target_ang_vel_yaw = -0.5  # 左转速度
+                elif key.char == 'q':
+                    self.target_ang_vel_yaw = 0.5  # 右转速度
+                elif key.char == 'r': 
+                    self.target_vel_x = 0.0
+                    self.target_vel_y = 0.0
+                    self.target_ang_vel_yaw = 0.0
+        except AttributeError:
+            pass
+
+    def on_release(self, key):
+        try:
+            with self.lock:
+                if key.char == 'e' or key.char == 'q':
+                    self.target_ang_vel_yaw = 0.0  # 松开 e 或 q 时重置角速度
+        except AttributeError:
+            pass
+
+    def run(self):
+        self.listener.start()
+        while self.running:
+            time.sleep(0.001)  # ✅ 释放CPU资源
+
+    def get_velocity(self):
+        with self.lock:
+            return self.target_vel_x, self.target_vel_y,self.target_ang_vel_yaw
+
+    def stop(self):
+        self.running = False
+        self.listener.stop()
+        self.join()
+
+joystick_use = False
 joystick_opened = False
 
 if joystick_use:
@@ -144,6 +206,8 @@ def run_mujoco(policy, cfg, env_cfg):
     Returns:
         None
     """
+    keyboard_thread = KeyboardThread()
+    keyboard_thread.start()
     print("Load mujoco xml from:", cfg.sim_config.mujoco_model_path)
     # load model xml
     model = mujoco.MjModel.from_xml_path(cfg.sim_config.mujoco_model_path)
@@ -183,6 +247,11 @@ def run_mujoco(policy, cfg, env_cfg):
         # 1000hz -> 100hz
         if count_lowlevel % cfg.sim_config.decimation == 0:
             ####### for stand only #######
+            x_vel_cmd,y_vel_cmd,yaw_vel_cmd = keyboard_thread.get_velocity()
+            # vel_x=0
+            # vel_y= 0
+            # ang_vel_yaw = 0
+            print(f"vel_x:{x_vel_cmd}, vel_y:{y_vel_cmd},ang_vel_yaw:{yaw_vel_cmd}")
             if hasattr(env_cfg.commands,"sw_switch"):
                 vel_norm = np.sqrt(x_vel_cmd**2 + y_vel_cmd**2 + yaw_vel_cmd**2)
                 if env_cfg.commands.sw_switch and vel_norm <= env_cfg.commands.stand_com_threshold:
@@ -214,7 +283,7 @@ def run_mujoco(policy, cfg, env_cfg):
                 stand_command = (vel_norm <= env_cfg.commands.stand_com_threshold)
                 obs[0, -1] = stand_command
             
-            print(x_vel_cmd, y_vel_cmd, yaw_vel_cmd)
+            # print(x_vel_cmd, y_vel_cmd, yaw_vel_cmd)
 
             obs = np.clip(obs, -env_cfg.normalization.clip_observations, env_cfg.normalization.clip_observations)
 
@@ -222,7 +291,7 @@ def run_mujoco(policy, cfg, env_cfg):
             hist_obs.popleft()
 
             policy_input = np.zeros([1, env_cfg.env.num_observations], dtype=np.float32)
-            print(policy_input.shape)
+            # print(policy_input.shape)
             for i in range(env_cfg.env.frame_stack):
                 policy_input[0, i * env_cfg.env.num_single_obs : (i + 1) * env_cfg.env.num_single_obs] = hist_obs[i][0, :]
             
@@ -245,46 +314,46 @@ def run_mujoco(policy, cfg, env_cfg):
         count_lowlevel += 1
         idx = 5
         dof_pos_target = target_q + cfg.robot_config.default_dof_pos
-        if _ < stop_state_log:
-            dict = {
-                    'base_height': base_z,
-                    'foot_z_l': foot_z[0],
-                    'foot_z_r': foot_z[1],
-                    'foot_forcez_l': foot_force_z[0],
-                    'foot_forcez_r': foot_force_z[1],
-                    'base_vel_x': v[0],
-                    'command_x': x_vel_cmd,
-                    'base_vel_y': v[1],
-                    'command_y': y_vel_cmd,
-                    'base_vel_z': v[2],
-                    'base_vel_yaw': omega[2],
-                    'command_yaw': yaw_vel_cmd,
-                    'dof_pos_target': dof_pos_target[idx],
-                    'dof_pos': q[idx],
-                    'dof_vel': dq[idx],
-                    'dof_torque': applied_tau[idx],
-                    'cmd_dof_torque': tau[idx],
-                }
+        # if _ < stop_state_log:
+        #     dict = {
+        #             'base_height': base_z,
+        #             'foot_z_l': foot_z[0],
+        #             'foot_z_r': foot_z[1],
+        #             'foot_forcez_l': foot_force_z[0],
+        #             'foot_forcez_r': foot_force_z[1],
+        #             'base_vel_x': v[0],
+        #             'command_x': x_vel_cmd,
+        #             'base_vel_y': v[1],
+        #             'command_y': y_vel_cmd,
+        #             'base_vel_z': v[2],
+        #             'base_vel_yaw': omega[2],
+        #             'command_yaw': yaw_vel_cmd,
+        #             'dof_pos_target': dof_pos_target[idx],
+        #             'dof_pos': q[idx],
+        #             'dof_vel': dq[idx],
+        #             'dof_torque': applied_tau[idx],
+        #             'cmd_dof_torque': tau[idx],
+        #         }
 
-            # add dof_pos_target
-            for i in range(env_cfg.env.num_actions):
-                dict[f'dof_pos_target[{i}]'] = dof_pos_target[i].item()
+        #     # add dof_pos_target
+        #     for i in range(env_cfg.env.num_actions):
+        #         dict[f'dof_pos_target[{i}]'] = dof_pos_target[i].item()
 
-            # add dof_pos
-            for i in range(env_cfg.env.num_actions):
-                dict[f'dof_pos[{i}]'] = q[i].item()
+        #     # add dof_pos
+        #     for i in range(env_cfg.env.num_actions):
+        #         dict[f'dof_pos[{i}]'] = q[i].item()
 
-            # add dof_torque
-            for i in range(env_cfg.env.num_actions):
-                dict[f'dof_torque[{i}]'] = applied_tau[i].item()
+        #     # add dof_torque
+        #     for i in range(env_cfg.env.num_actions):
+        #         dict[f'dof_torque[{i}]'] = applied_tau[i].item()
 
-            # add dof_vel
-            for i in range(env_cfg.env.num_actions):
-                dict[f'dof_vel[{i}]'] = dq[i].item()
-            logger.log_states(dict=dict)
+        #     # add dof_vel
+        #     for i in range(env_cfg.env.num_actions):
+        #         dict[f'dof_vel[{i}]'] = dq[i].item()
+        #     logger.log_states(dict=dict)
         
-        elif _== stop_state_log:
-            logger.plot_states()
+        # elif _== stop_state_log:
+        #     logger.plot_states()
 
     viewer.close()
 
@@ -321,14 +390,15 @@ if __name__ == '__main__':
 
     # load model
     root_path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', args.task, 'exported_policies')
-    if args.load_model == None:
-        jit_path = os.listdir(root_path)
-        jit_path.sort()
-        model_path = os.path.join(root_path, jit_path[-1])
-    else:
-        model_path = os.path.join(root_path, args.load_model)
-    jit_name = os.listdir(model_path)
-    model_path = os.path.join(model_path,jit_name[-1])
+    model_path = args.load_model
+    # if args.load_model == None:
+    #     jit_path = os.listdir(root_path)
+    #     jit_path.sort()
+    #     model_path = os.path.join(root_path, jit_path[-1])
+    # else:
+    #     model_path = os.path.join(root_path, args.load_model)
+    # jit_name = os.listdir(model_path)
+    # model_path = os.path.join(model_path,jit_name[-1])
     policy = torch.jit.load(model_path)
     print("Load model from:", model_path)
 

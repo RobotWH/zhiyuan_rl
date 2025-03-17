@@ -350,61 +350,85 @@ class XBotDHStandEnv(LeggedRobot):
                 self.rand_push_force.zero_()
                 self.rand_push_torque.zero_()
 
+    # def compute_ref_state(self):
+    #     phase = self._get_phase()
+    #     sin_pos = torch.sin(2 * torch.pi * phase)
+    #     sin_pos_l = sin_pos.clone()
+    #     sin_pos_r = sin_pos.clone()
+
+    #     self.ref_dof_pos = torch.zeros_like(self.dof_pos)
+    #     # left swing
+    #     sin_pos_l[sin_pos_l > 0] = 0
+    #     self.ref_dof_pos[:, 0] = (
+    #         sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[0]
+    #     )
+    #     self.ref_dof_pos[:, 1] = (
+    #         sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[1]
+    #     )
+    #     self.ref_dof_pos[:, 2] = (
+    #         sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[2]
+    #     )
+    #     self.ref_dof_pos[:, 3] = (
+    #         sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[3]
+    #     )
+    #     self.ref_dof_pos[:, 4] = (
+    #         sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[4]
+    #     )
+    #     self.ref_dof_pos[:, 5] = (
+    #         sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[5]
+    #     )
+    #     # right
+    #     sin_pos_r[sin_pos_r < 0] = 0
+    #     self.ref_dof_pos[:, 6] = (
+    #         sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[6]
+    #     )
+    #     self.ref_dof_pos[:, 7] = (
+    #         sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[7]
+    #     )
+    #     self.ref_dof_pos[:, 8] = (
+    #         sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[8]
+    #     )
+    #     self.ref_dof_pos[:, 9] = (
+    #         sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[9]
+    #     )
+    #     self.ref_dof_pos[:, 10] = (
+    #         sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[10]
+    #     )
+    #     self.ref_dof_pos[:, 11] = (
+    #         sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[11]
+    #     )
+
+    #     self.ref_dof_pos[torch.abs(sin_pos) < 0.1] = 0.0
+
+    #     # if use_ref_actions=True, action += ref_action
+    #     self.ref_action = 2 * self.ref_dof_pos
+
+    #     # self.ref_dof_pos set ref dof pos for swing leg, ref_dof_pos=0 for stance leg
+    #     self.ref_dof_pos += self.default_dof_pos
+
     def compute_ref_state(self):
         phase = self._get_phase()
+        # print(f"torch.norm(self.commands[:, :2]):{torch.norm(self.commands[:, :2])}")
         sin_pos = torch.sin(2 * torch.pi * phase)
         sin_pos_l = sin_pos.clone()
         sin_pos_r = sin_pos.clone()
-
         self.ref_dof_pos = torch.zeros_like(self.dof_pos)
-        # left swing
+               
+        foot_ref_joints=[-0.25,-0.15,0.10,0.25,0.15,-0.10]
+        # print("aaaaaa")
         sin_pos_l[sin_pos_l > 0] = 0
-        self.ref_dof_pos[:, 0] = (
-            sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[0]
-        )
-        self.ref_dof_pos[:, 1] = (
-            sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[1]
-        )
-        self.ref_dof_pos[:, 2] = (
-            sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[2]
-        )
-        self.ref_dof_pos[:, 3] = (
-            sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[3]
-        )
-        self.ref_dof_pos[:, 4] = (
-            sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[4]
-        )
-        self.ref_dof_pos[:, 5] = (
-            sin_pos_l * self.cfg.rewards.final_swing_joint_delta_pos[5]
-        )
-        # right
+        self.ref_dof_pos[:, 2] = torch.abs(sin_pos_l) * foot_ref_joints[0]
+        self.ref_dof_pos[:, 3] = torch.abs(sin_pos_l) * foot_ref_joints[1]
+        self.ref_dof_pos[:, 4] = torch.abs(sin_pos_l) * foot_ref_joints[2]
         sin_pos_r[sin_pos_r < 0] = 0
-        self.ref_dof_pos[:, 6] = (
-            sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[6]
-        )
-        self.ref_dof_pos[:, 7] = (
-            sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[7]
-        )
-        self.ref_dof_pos[:, 8] = (
-            sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[8]
-        )
-        self.ref_dof_pos[:, 9] = (
-            sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[9]
-        )
-        self.ref_dof_pos[:, 10] = (
-            sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[10]
-        )
-        self.ref_dof_pos[:, 11] = (
-            sin_pos_r * self.cfg.rewards.final_swing_joint_delta_pos[11]
-        )
+        self.ref_dof_pos[:, 8] = torch.abs(sin_pos_r) * foot_ref_joints[3]
+        self.ref_dof_pos[:, 9] = torch.abs(sin_pos_r) * foot_ref_joints[4]
+        self.ref_dof_pos[:, 10] = torch.abs(sin_pos_r) * foot_ref_joints[5]
+        # print(f"ref_dof_pos:{self.ref_dof_pos}")
 
-        self.ref_dof_pos[torch.abs(sin_pos) < 0.1] = 0.0
-
-        # if use_ref_actions=True, action += ref_action
+        # Double support phase
+        self.ref_dof_pos[torch.abs(sin_pos) < 0.1] = 0
         self.ref_action = 2 * self.ref_dof_pos
-
-        # self.ref_dof_pos set ref dof pos for swing leg, ref_dof_pos=0 for stance leg
-        self.ref_dof_pos += self.default_dof_pos
 
     def create_sim(self):
         """Creates simulation, terrain and evironments"""
@@ -782,15 +806,10 @@ class XBotDHStandEnv(LeggedRobot):
         """
         joint_pos = self.dof_pos.clone()
         pos_target = self.ref_dof_pos.clone()
-        stand_command = (
-            torch.norm(self.commands[:, :3], dim=1)
-            <= self.cfg.commands.stand_com_threshold
-        )
+        stand_command = (torch.norm(self.commands[:, :3], dim=1)<= self.cfg.commands.stand_com_threshold)
         pos_target[stand_command] = self.default_dof_pos.clone()
         diff = joint_pos - pos_target
-        r = torch.exp(-2 * torch.norm(diff, dim=1)) - 0.2 * torch.norm(
-            diff, dim=1
-        ).clamp(0, 0.5)
+        r = torch.exp(-2 * torch.norm(diff, dim=1)) - 0.2 * torch.norm(diff, dim=1).clamp(0, 0.5)
         r[stand_command] = 1.0
         return r
 
@@ -804,9 +823,7 @@ class XBotDHStandEnv(LeggedRobot):
         max_df = self.cfg.rewards.foot_max_dist
         d_min = torch.clamp(foot_dist - fd, -0.5, 0.0)
         d_max = torch.clamp(foot_dist - max_df, 0, 0.5)
-        return (
-            torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)
-        ) / 2
+        return (torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)) / 2
 
     def _reward_knee_distance(self):
         """
@@ -814,8 +831,8 @@ class XBotDHStandEnv(LeggedRobot):
         """
         foot_pos = self.rigid_state[:, self.knee_indices, :2]
         foot_dist = torch.norm(foot_pos[:, 0, :] - foot_pos[:, 1, :], dim=1)
-        fd = self.cfg.rewards.foot_min_dist
-        max_df = self.cfg.rewards.foot_max_dist / 2
+        fd = self.cfg.rewards.knee_min_dist
+        max_df = self.cfg.rewards.knee_max_dist
         d_min = torch.clamp(foot_dist - fd, -0.5, 0.0)
         d_max = torch.clamp(foot_dist - max_df, 0, 0.5)
         return (
@@ -853,19 +870,31 @@ class XBotDHStandEnv(LeggedRobot):
         self.feet_air_time *= ~self.contact_filt
         return air_time.sum(dim=1)
 
+    # def _reward_feet_contact_number(self):
+    #     """
+    #     Calculates a reward based on the number of feet contacts aligning with the gait phase.
+    #     Rewards or penalizes depending on whether the foot contact matches the expected gait phase.
+    #     """
+    #     contact = self.contact_forces[:, self.feet_indices, 2] > 5.0
+    #     stance_mask = self._get_stance_mask().clone()
+    #     stance_mask[
+    #         torch.norm(self.commands[:, :3], dim=1)
+    #         <= self.cfg.commands.stand_com_threshold
+    #     ] = 1
+    #     reward = torch.where(contact == stance_mask, 1, -0.3)
+    #     return torch.mean(reward, dim=1)
     def _reward_feet_contact_number(self):
         """
-        Calculates a reward based on the number of feet contacts aligning with the gait phase.
+        Calculates a reward based on the number of feet contacts aligning with the gait phase. 
         Rewards or penalizes depending on whether the foot contact matches the expected gait phase.
         """
-        contact = self.contact_forces[:, self.feet_indices, 2] > 5.0
-        stance_mask = self._get_stance_mask().clone()
-        stance_mask[
-            torch.norm(self.commands[:, :3], dim=1)
-            <= self.cfg.commands.stand_com_threshold
-        ] = 1
-        reward = torch.where(contact == stance_mask, 1, -0.3)
-        return torch.mean(reward, dim=1)
+        contact = self.contact_forces[:, self.feet_indices, 2] > 5.
+        stance_mask = self._get_stance_mask()
+        both_stand_mask = torch.ones((self.num_envs, 2), device=self.device)
+        row_matches = torch.where(torch.norm(self.commands[:, :2])>self.cfg.commands.stand_com_threshold,(contact == stance_mask).all(dim=1),(contact == both_stand_mask).all(dim=1))
+        reward = torch.where(torch.norm(self.commands[:, :2])>self.cfg.commands.stand_com_threshold,torch.where(row_matches,1,-1),torch.where(row_matches,1,-1))
+        # print(f"_reward_feet_contact_number:{reward}")
+        return reward
 
     def _reward_orientation(self):
         """

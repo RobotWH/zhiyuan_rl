@@ -333,8 +333,12 @@ class XBotDHStandCfg(LeggedRobotCfg):
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.9
         base_height_target = 0.89
-        foot_min_dist = 0.2
-        foot_max_dist = 1.0
+        # foot_min_dist = 0.2
+        # foot_max_dist = 1.0
+        foot_min_dist = 0.15
+        foot_max_dist = 0.35
+        knee_min_dist = 0.15
+        knee_max_dist = 0.35
 
         # foot_ref_joints = [-0.34, -0.15, 0.25, 0.34, 0.15, -0.25]
         # final_swing_joint_pos = final_swing_joint_delta_pos + default_pos
@@ -365,6 +369,9 @@ class XBotDHStandCfg(LeggedRobotCfg):
 
         class scales:
             ref_joint_pos = 2.2
+            # other_joint_pos = 2.0
+            # arms_joint_pos = 1.0
+            # legs_joint_pos = 2.0
             feet_clearance = 1.0
             feet_contact_number = 2.0
             # gait
@@ -375,8 +382,8 @@ class XBotDHStandCfg(LeggedRobotCfg):
             # contact
             feet_contact_forces = -0.01
             # vel tracking
-            tracking_lin_vel = 1.8
-            tracking_ang_vel = 1.1
+            tracking_lin_vel = 2.0
+            tracking_ang_vel = 1.5
             vel_mismatch_exp = 0.5  # lin_z; ang x,y
             low_speed = 0.2
             track_vel_hard = 0.5
